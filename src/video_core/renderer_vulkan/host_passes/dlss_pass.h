@@ -46,7 +46,7 @@ private:
     void CreateImages(Img& img) const;
 
     vk::Device device{};
-    VmaAllocator allocator{};
+    VmaAllocator allocator{}; // Stored for future DLSS buffer/image allocation when SDK is integrated
     u32 num_images{};
     bool is_available{false};
 
