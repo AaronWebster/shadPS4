@@ -16,6 +16,8 @@
 #include "common/logging/log.h"
 #include "common/thread.h"
 #include "core/ipc/ipc.h"
+#include "core/libraries/network/netctl.h"
+#include "core/xiltimer.h"
 #ifdef ENABLE_DISCORD_RPC
 #include "common/discord_rpc_handler.h"
 #endif
@@ -286,6 +288,17 @@ void Emulator::Run(std::filesystem::path file, std::vector<std::string> args,
     memory = Core::Memory::Instance();
     controller = Common::Singleton<Input::GameController>::Instance();
     linker = Common::Singleton<Core::Linker>::Instance();
+
+    // Initialize PHY driver
+    Libraries::NetPhy::Phy_Init(&phy_driver);
+    
+    // Set PHY driver for network control
+    Libraries::NetCtl::SetPhyDriver(&phy_driver);
+    
+    // Register PHY polling with timer
+    Core::XilTimer::Instance().RegisterPollTask("PHY_Driver", [this]() {
+        Libraries::NetPhy::Phy_Poll(&phy_driver);
+    });
 
     // Load renderdoc module
     VideoCore::LoadRenderDoc();

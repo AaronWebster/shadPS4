@@ -9,6 +9,7 @@
 
 #include "common/singleton.h"
 #include "core/linker.h"
+#include "core/libraries/network/net_phy.h"
 #include "input/controller.h"
 #include "sdl_window.h"
 
@@ -38,6 +39,9 @@ public:
 
     const char* executableName;
     bool waitForDebuggerBeforeRun{false};
+
+    // PHY driver instance
+    Libraries::NetPhy::PhyDriver phy_driver;
 
 private:
     void LoadSystemModules(const std::string& game_serial);

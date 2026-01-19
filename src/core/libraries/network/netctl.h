@@ -6,11 +6,18 @@
 #include "common/types.h"
 #include "core/libraries/network/net_ctl_obj.h"
 
+namespace Libraries::NetPhy {
+struct PhyDriver;
+}
+
 namespace Core::Loader {
 class SymbolsResolver;
 }
 
 namespace Libraries::NetCtl {
+
+// Set the global PHY driver pointer
+void SetPhyDriver(NetPhy::PhyDriver* phy);
 
 constexpr int ORBIS_NET_ETHER_ADDR_LEN = 6;
 

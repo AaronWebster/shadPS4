@@ -354,6 +354,8 @@ set(NETWORK_LIBS src/core/libraries/network/http.cpp
                  src/core/libraries/network/net_ctl_obj.cpp
                  src/core/libraries/network/net_ctl_obj.h
                  src/core/libraries/network/net_ctl_codes.h
+                 src/core/libraries/network/net_phy.cpp
+                 src/core/libraries/network/net_phy.h
                  src/core/libraries/network/net_util.cpp
                  src/core/libraries/network/net_util.h
                  src/core/libraries/network/net_epoll.cpp
@@ -848,6 +850,8 @@ set(CORE src/core/aerolib/stubs.cpp
          src/core/tls.h
          src/core/emulator_state.cpp
          src/core/emulator_state.h
+         src/core/xiltimer.cpp
+         src/core/xiltimer.h
 )
 
 if (ARCHITECTURE STREQUAL "x86_64")
