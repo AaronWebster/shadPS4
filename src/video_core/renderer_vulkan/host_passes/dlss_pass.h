@@ -37,7 +37,9 @@ public:
         bool reset{false};             // Reset accumulation
     };
 
-    void Create(vk::Device device, VmaAllocator allocator, u32 num_images, bool is_nvidia_gpu);
+    void Create(vk::Device device, vk::Instance instance, vk::PhysicalDevice physical_device,
+                VmaAllocator allocator, u32 num_images, u32 graphics_queue_family,
+                bool is_nvidia_gpu);
 
     vk::ImageView Render(vk::CommandBuffer cmdbuf, const RenderInputs& inputs, Settings settings);
 
@@ -62,12 +64,15 @@ private:
     void CreateImages(Img& img) const;
 
     // Streamline SDK initialization
-    void InitializeStreamline(vk::Device device);
+    void InitializeStreamline();
     void ShutdownStreamline();
 
     vk::Device device{};
+    vk::Instance instance{};
+    vk::PhysicalDevice physical_device{};
     VmaAllocator allocator{};
     u32 num_images{};
+    u32 graphics_queue_family{};
     bool is_available{false};
     bool streamline_initialized{false};
 
