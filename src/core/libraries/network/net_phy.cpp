@@ -8,6 +8,9 @@
 
 namespace Libraries::NetPhy {
 
+// Number of poll cycles required for PHY initialization
+constexpr u32 PHY_INIT_POLL_CYCLES = 3;
+
 void Phy_Init(PhyDriver* phy) {
     if (!phy) {
         LOG_ERROR(Lib_Net, "Phy_Init: Invalid PHY driver pointer");
@@ -38,8 +41,8 @@ void Phy_Poll(PhyDriver* phy) {
         // Simulate initialization progress
         phy->init_counter++;
         
-        // After a few poll cycles, mark as operational
-        if (phy->init_counter >= 3) {
+        // After required poll cycles, mark as operational
+        if (phy->init_counter >= PHY_INIT_POLL_CYCLES) {
             phy->state = PhyState::OPERATIONAL;
             phy->link_up = Config::getIsConnectedToNetwork();
             LOG_INFO(Lib_Net, "PHY driver now operational (link {})", 

@@ -19,7 +19,13 @@ void XilTimer::RegisterPollTask(const std::string& name, PollCallback callback) 
 void XilTimer::PollAll() {
     for (auto& task : poll_tasks) {
         if (task.enabled && task.callback) {
-            task.callback();
+            try {
+                task.callback();
+            } catch (const std::exception& e) {
+                LOG_ERROR(Core, "Exception in poll task '{}': {}", task.name, e.what());
+            } catch (...) {
+                LOG_ERROR(Core, "Unknown exception in poll task '{}'", task.name);
+            }
         }
     }
 }
