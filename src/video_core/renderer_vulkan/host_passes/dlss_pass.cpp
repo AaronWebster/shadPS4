@@ -13,14 +13,38 @@
 #include <sl.h>
 #include <sl_dlss.h>
 #include <sl_dlss_g.h>
+#include <sl_helpers_vk.h>
+
+namespace {
+// Convert DlssPass quality setting to Streamline DLSSMode
+sl::DLSSMode ConvertQuality(Vulkan::HostPasses::DlssPass::Quality quality) {
+    switch (quality) {
+    case Vulkan::HostPasses::DlssPass::Quality::Performance:
+        return sl::DLSSMode::eMaxPerformance;
+    case Vulkan::HostPasses::DlssPass::Quality::Balanced:
+        return sl::DLSSMode::eBalanced;
+    case Vulkan::HostPasses::DlssPass::Quality::Quality:
+        return sl::DLSSMode::eMaxQuality;
+    case Vulkan::HostPasses::DlssPass::Quality::UltraPerformance:
+        return sl::DLSSMode::eUltraPerformance;
+    default:
+        return sl::DLSSMode::eMaxQuality;
+    }
+}
+} // namespace
 #endif
 
 namespace Vulkan::HostPasses {
 
-void DlssPass::Create(vk::Device device, VmaAllocator allocator, u32 num_images, bool is_nvidia_gpu) {
+void DlssPass::Create(vk::Device device, vk::Instance instance, vk::PhysicalDevice physical_device,
+                      VmaAllocator allocator, u32 num_images, u32 graphics_queue_family,
+                      bool is_nvidia_gpu) {
     this->device = device;
+    this->instance = instance;
+    this->physical_device = physical_device;
     this->allocator = allocator;
     this->num_images = num_images;
+    this->graphics_queue_family = graphics_queue_family;
 
     // DLSS requires NVIDIA GPU and Streamline SDK integration
     // For now, only check if it's NVIDIA hardware
@@ -28,7 +52,7 @@ void DlssPass::Create(vk::Device device, VmaAllocator allocator, u32 num_images,
 
 #ifdef _WIN32
     if (is_nvidia_gpu) {
-        InitializeStreamline(device);
+        InitializeStreamline();
     }
 #else
     LOG_WARNING(Render_Vulkan, "DLSS is only supported on Windows with NVIDIA GPUs");
@@ -42,7 +66,7 @@ void DlssPass::Create(vk::Device device, VmaAllocator allocator, u32 num_images,
     }
 }
 
-void DlssPass::InitializeStreamline(vk::Device device) {
+void DlssPass::InitializeStreamline() {
 #ifdef _WIN32
     if (streamline_initialized) {
         return;
@@ -50,26 +74,83 @@ void DlssPass::InitializeStreamline(vk::Device device) {
 
     LOG_INFO(Render_Vulkan, "Initializing NVIDIA Streamline SDK for DLSS 4.5");
 
-    // TODO: Complete Streamline initialization
-    // This requires:
-    // 1. sl::Preferences setup with application info
-    // 2. sl::init() call with Vulkan device handles
-    // 3. Feature registration for DLSS-SR and DLSS-G
-    // 4. Query supported quality modes and capabilities
+    // Setup Streamline preferences
+    sl::Preferences prefs{};
+    prefs.showConsole = false;
+    prefs.logLevel = sl::LogLevel::eDefault;
+    prefs.pathsToPlugins = nullptr;
+    prefs.numPathsToPlugins = 0;
+    prefs.pathToLogsAndData = nullptr;
+    prefs.allocateCallback = nullptr;
+    prefs.releaseCallback = nullptr;
+    prefs.logMessageCallback = nullptr;
+    prefs.flags = sl::PreferenceFlags::eDisableCLStateTracking |
+                  sl::PreferenceFlags::eAllowOTA |
+                  sl::PreferenceFlags::eLoadDownloadedPlugins |
+                  sl::PreferenceFlags::eUseFrameBasedResourceTagging;
+
+    // Initialize Streamline SDK
+    sl::Result result = slInit(prefs, sl::kSDKVersion);
+    if (result != sl::Result::eOk) {
+        LOG_ERROR(Render_Vulkan, "Failed to initialize Streamline SDK: {}", static_cast<int>(result));
+        streamline_initialized = false;
+        return;
+    }
+
+    // Setup Vulkan device information for Streamline
+    sl::VulkanInfo vk_info{};
+    vk_info.device = static_cast<VkDevice>(device);
+    vk_info.instance = static_cast<VkInstance>(instance);
+    vk_info.physicalDevice = static_cast<VkPhysicalDevice>(physical_device);
+    vk_info.graphicsQueueFamily = graphics_queue_family;
+    vk_info.graphicsQueueIndex = 0;
+    vk_info.computeQueueFamily = graphics_queue_family;
+    vk_info.computeQueueIndex = 0;
+    vk_info.opticalFlowQueueFamily = graphics_queue_family;
+    vk_info.opticalFlowQueueIndex = 0;
+    vk_info.useNativeOpticalFlowMode = false;
+
+    result = slSetVulkanInfo(vk_info);
+    if (result != sl::Result::eOk) {
+        LOG_ERROR(Render_Vulkan, "Failed to set Vulkan info for Streamline: {}", static_cast<int>(result));
+        slShutdown();
+        streamline_initialized = false;
+        return;
+    }
+
+    // Check if DLSS is supported
+    sl::AdapterInfo adapter_info{};
+    adapter_info.vkPhysicalDevice = static_cast<VkPhysicalDevice>(physical_device);
     
-    // For now, mark as not initialized until full implementation
-    streamline_initialized = false;
-    
-    LOG_WARNING(Render_Vulkan, "Streamline SDK initialization requires additional setup - DLSS will use passthrough mode");
+    result = slIsFeatureSupported(sl::kFeatureDLSS, adapter_info);
+    if (result != sl::Result::eOk) {
+        LOG_WARNING(Render_Vulkan, "DLSS feature is not supported on this adapter: {}", static_cast<int>(result));
+        slShutdown();
+        streamline_initialized = false;
+        is_available = false;
+        return;
+    }
+
+    // Set DLSS feature to loaded state
+    result = slSetFeatureLoaded(sl::kFeatureDLSS, true);
+    if (result != sl::Result::eOk) {
+        LOG_ERROR(Render_Vulkan, "Failed to load DLSS feature: {}", static_cast<int>(result));
+        slShutdown();
+        streamline_initialized = false;
+        return;
+    }
+
+    streamline_initialized = true;
+    LOG_INFO(Render_Vulkan, "Streamline SDK initialized successfully for DLSS");
 #endif
 }
 
 void DlssPass::ShutdownStreamline() {
 #ifdef _WIN32
     if (streamline_initialized) {
-        // TODO: Call sl::shutdown() when fully implemented
+        slShutdown();
         streamline_initialized = false;
-        LOG_INFO(Render_Vulkan, "Streamline SDK shutdown");
+        LOG_INFO(Render_Vulkan, "Streamline SDK shutdown completed");
     }
 #endif
 }
@@ -87,41 +168,66 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, const RenderInputs& inp
     }
 
 #ifdef _WIN32
-    if (streamline_initialized) {
-        // TODO: Implement actual DLSS evaluation with Streamline SDK
-        // This would involve:
-        // 1. Setting up sl::Resource tags for input textures (color, motion vectors, depth)
-        // 2. Configuring DLSS constants (quality mode, sharpness, jitter)
-        // 3. Calling sl::evaluateFeature with kFeatureDLSS
-        // 4. For frame generation (DLSS 4.5), also evaluate kFeatureDLSS_G
-        // 5. Proper synchronization and resource state transitions
-        
-        LOG_DEBUG(Render_Vulkan, "DLSS evaluation with motion vectors: {}, depth: {}", 
-                  inputs.motion_vectors ? "yes" : "no",
-                  inputs.depth_buffer ? "yes" : "no");
+    if (!streamline_initialized) {
+        LOG_DEBUG(Render_Vulkan, "Streamline not initialized, using passthrough mode");
+        return inputs.color_input;
     }
-#endif
+
+    PrepareOutputImage(inputs.output_size);
+
+    // Setup DLSS options
+    sl::DLSSOptions dlss_options{};
+    dlss_options.mode = ConvertQuality(settings.quality);
+    dlss_options.outputWidth = inputs.output_size.width;
+    dlss_options.outputHeight = inputs.output_size.height;
+    dlss_options.colorBuffersHDR = inputs.hdr ? sl::Boolean::eTrue : sl::Boolean::eFalse;
+
+    // Setup DLSS constants
+    sl::Constants constants{};
+    constants.jitterOffset = {inputs.jitter_offset_x, inputs.jitter_offset_y};
+    constants.mvecScale = {1.0f, 1.0f};  // Motion vector scale
+    constants.reset = inputs.reset ? sl::Boolean::eTrue : sl::Boolean::eFalse;
+    constants.sharpness = inputs.sharpness;
+
+    // Get a new frame token
+    sl::FrameToken* frame_token = nullptr;
+    sl::Result result = slGetNewFrameToken(&frame_token, &frame_index);
+    if (result != sl::Result::eOk || !frame_token) {
+        LOG_ERROR(Render_Vulkan, "Failed to get frame token: {}", static_cast<int>(result));
+        return inputs.color_input;
+    }
+
+    // Set constants for this frame
+    sl::ViewportHandle viewport{0};
+    result = slSetConstants(constants, *frame_token, viewport);
+    if (result != sl::Result::eOk) {
+        LOG_ERROR(Render_Vulkan, "Failed to set DLSS constants: {}", static_cast<int>(result));
+        return inputs.color_input;
+    }
+
+    // Tag input color resource
+    // Note: For Vulkan, we need to provide the native image, memory, and view
+    // Since we only have ImageView, we'll use a simplified tagging approach
+    // In a production implementation, these resources would be fully tracked
+    std::vector<sl::ResourceTag> tags;
     
-    // Prepare output infrastructure
-    if (inputs.output_size != cur_size) {
-        ResizeAndInvalidate(inputs.output_size.width, inputs.output_size.height);
-    }
-
-    auto& img = available_imgs[cur_image];
-    if (++cur_image >= available_imgs.size()) {
-        cur_image = 0;
-    }
-
-    if (img.dirty) {
-        CreateImages(img);
-    }
-
+    // For now, return the input as passthrough since we don't have full resource information
+    // A complete implementation would require tracking VkImage and VkDeviceMemory handles
+    LOG_DEBUG(Render_Vulkan, "DLSS evaluation with motion vectors: {}, depth: {}", 
+              inputs.motion_vectors ? "yes" : "no",
+              inputs.depth_buffer ? "yes" : "no");
+    
+    LOG_WARNING(Render_Vulkan, "DLSS evaluation requires full Vulkan resource tracking - using passthrough mode");
+    
+    frame_index++;
+    return inputs.color_input;
+#else
+    PrepareOutputImage(inputs.output_size);
     frame_index++;
 
-    // When DLSS SDK is integrated, the upscaled result would be written to img.output_image
-    // and we would return img.output_image_view.get() instead of the input
-    // For now, return input as passthrough
+    // Non-Windows platforms don't support DLSS
     return inputs.color_input;
+#endif
 }
 
 // Legacy interface for backward compatibility
@@ -135,6 +241,22 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, vk::ImageView input,
     inputs.hdr = hdr;
     
     return Render(cmdbuf, inputs, settings);
+}
+
+void DlssPass::PrepareOutputImage(const vk::Extent2D& output_size) {
+    // Prepare output infrastructure
+    if (output_size != cur_size) {
+        ResizeAndInvalidate(output_size.width, output_size.height);
+    }
+
+    auto& img = available_imgs[cur_image];
+    if (++cur_image >= available_imgs.size()) {
+        cur_image = 0;
+    }
+
+    if (img.dirty) {
+        CreateImages(img);
+    }
 }
 
 void DlssPass::ResizeAndInvalidate(u32 width, u32 height) {
