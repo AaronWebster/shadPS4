@@ -33,6 +33,12 @@ void SetPhyDriver(NetPhy::PhyDriver* phy) {
     g_phy_driver = phy;
 }
 
+// Helper function to check if network is available (config + PHY operational)
+static bool IsNetworkAvailable() {
+    const bool phy_operational = g_phy_driver ? NetPhy::Phy_IsOperational(g_phy_driver) : false;
+    return Config::getIsConnectedToNetwork() && phy_operational;
+}
+
 int PS4_SYSV_ABI sceNetBweCheckCallbackIpcInt() {
     LOG_ERROR(Lib_NetCtl, "(STUBBED) called");
     return ORBIS_OK;
@@ -170,7 +176,9 @@ int PS4_SYSV_ABI sceNetCtlGetIfStat() {
 
 int PS4_SYSV_ABI sceNetCtlGetInfo(int code, OrbisNetCtlInfo* info) {
     LOG_DEBUG(Lib_NetCtl, "code = {}", code);
-    if (!Config::getIsConnectedToNetwork()) {
+    
+    // Check if network is available (PHY operational + config connected)
+    if (!IsNetworkAvailable()) {
         return ORBIS_NET_CTL_ERROR_NOT_CONNECTED;
     }
 
@@ -188,8 +196,8 @@ int PS4_SYSV_ABI sceNetCtlGetInfo(int code, OrbisNetCtlInfo* info) {
         info->mtu = 1500; // default value
         break;
     case ORBIS_NET_CTL_INFO_LINK:
-        info->link = Config::getIsConnectedToNetwork() ? ORBIS_NET_CTL_LINK_CONNECTED
-                                                       : ORBIS_NET_CTL_LINK_DISCONNECTED;
+        info->link = IsNetworkAvailable() ? ORBIS_NET_CTL_LINK_CONNECTED
+                                          : ORBIS_NET_CTL_LINK_DISCONNECTED;
         break;
     case ORBIS_NET_CTL_INFO_IP_ADDRESS: {
         strcpy(info->ip_address,
@@ -326,12 +334,12 @@ int PS4_SYSV_ABI sceNetCtlGetScanInfoForSsidScanIpcInt() {
 }
 
 int PS4_SYSV_ABI sceNetCtlGetState(int* state) {
-    // Check PHY driver state first
-    const bool phy_operational = g_phy_driver ? NetPhy::Phy_IsOperational(g_phy_driver) : false;
-    const auto connected = Config::getIsConnectedToNetwork() && phy_operational;
+    // Check both config and PHY driver state
+    const auto connected = IsNetworkAvailable();
     
     LOG_DEBUG(Lib_NetCtl, "connected = {}, phy_operational = {}", 
-              Config::getIsConnectedToNetwork(), phy_operational);
+              Config::getIsConnectedToNetwork(), 
+              g_phy_driver ? NetPhy::Phy_IsOperational(g_phy_driver) : false);
     
     const auto current_state =
         connected ? ORBIS_NET_CTL_STATE_IPOBTAINED : ORBIS_NET_CTL_STATE_DISCONNECTED;
