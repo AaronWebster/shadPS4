@@ -46,6 +46,7 @@ private:
     void CreateImages(Img& img) const;
 
     vk::Device device{};
+    VmaAllocator allocator{};
     u32 num_images{};
     bool is_available{false};
 

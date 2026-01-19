@@ -11,6 +11,7 @@ namespace Vulkan::HostPasses {
 
 void DlssPass::Create(vk::Device device, VmaAllocator allocator, u32 num_images, bool is_nvidia_gpu) {
     this->device = device;
+    this->allocator = allocator;
     this->num_images = num_images;
 
     // DLSS requires NVIDIA GPU and Streamline SDK integration
