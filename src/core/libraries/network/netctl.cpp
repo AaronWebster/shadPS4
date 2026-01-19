@@ -18,12 +18,20 @@
 #include "core/libraries/error_codes.h"
 #include "core/libraries/libs.h"
 #include "core/libraries/network/net_ctl_codes.h"
+#include "core/libraries/network/net_phy.h"
 #include "core/libraries/network/netctl.h"
 #include "net_util.h"
 
 namespace Libraries::NetCtl {
 
 static NetCtlInternal netctl;
+
+// Global PHY driver pointer (set by emulator)
+static NetPhy::PhyDriver* g_phy_driver = nullptr;
+
+void SetPhyDriver(NetPhy::PhyDriver* phy) {
+    g_phy_driver = phy;
+}
 
 int PS4_SYSV_ABI sceNetBweCheckCallbackIpcInt() {
     LOG_ERROR(Lib_NetCtl, "(STUBBED) called");
@@ -318,8 +326,13 @@ int PS4_SYSV_ABI sceNetCtlGetScanInfoForSsidScanIpcInt() {
 }
 
 int PS4_SYSV_ABI sceNetCtlGetState(int* state) {
-    const auto connected = Config::getIsConnectedToNetwork();
-    LOG_DEBUG(Lib_NetCtl, "connected = {}", connected);
+    // Check PHY driver state first
+    const bool phy_operational = g_phy_driver ? NetPhy::Phy_IsOperational(g_phy_driver) : false;
+    const auto connected = Config::getIsConnectedToNetwork() && phy_operational;
+    
+    LOG_DEBUG(Lib_NetCtl, "connected = {}, phy_operational = {}", 
+              Config::getIsConnectedToNetwork(), phy_operational);
+    
     const auto current_state =
         connected ? ORBIS_NET_CTL_STATE_IPOBTAINED : ORBIS_NET_CTL_STATE_DISCONNECTED;
     *state = current_state;

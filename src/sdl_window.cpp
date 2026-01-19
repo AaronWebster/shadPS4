@@ -14,6 +14,7 @@
 #include "core/devtools/layer.h"
 #include "core/libraries/kernel/time.h"
 #include "core/libraries/pad/pad.h"
+#include "core/xiltimer.h"
 #include "imgui/renderer/imgui_core.h"
 #include "input/controller.h"
 #include "input/input_handler.h"
@@ -274,6 +275,11 @@ static Uint32 SDLCALL PollController(void* userdata, SDL_TimerID timer_id, Uint3
     return controller->Poll();
 }
 
+static Uint32 SDLCALL PollAllTasks(void* userdata, SDL_TimerID timer_id, Uint32 interval) {
+    Core::XilTimer::Instance().PollAll();
+    return interval; // Continue timer
+}
+
 WindowSDL::WindowSDL(s32 width_, s32 height_, Input::GameController* controller_,
                      std::string_view window_title)
     : width{width_}, height{height_}, controller{controller_} {
@@ -473,6 +479,7 @@ void WindowSDL::WaitEvent() {
 void WindowSDL::InitTimers() {
     SDL_AddTimer(100, &PollController, controller);
     SDL_AddTimer(33, Input::MousePolling, (void*)controller);
+    SDL_AddTimer(100, &PollAllTasks, nullptr); // Poll all registered tasks (PHY, etc.)
 }
 
 void WindowSDL::RequestKeyboard() {
