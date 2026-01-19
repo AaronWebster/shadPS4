@@ -11,7 +11,6 @@ namespace Vulkan::HostPasses {
 
 void DlssPass::Create(vk::Device device, VmaAllocator allocator, u32 num_images, bool is_nvidia_gpu) {
     this->device = device;
-    this->allocator = allocator;
     this->num_images = num_images;
 
     // DLSS requires NVIDIA GPU and Streamline SDK integration
@@ -49,7 +48,11 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, vk::ImageView input,
     // This requires integration with NVIDIA Streamline SDK
     // For now, this is a placeholder that returns the input unchanged
     
-    // Placeholder implementation:
+    // NOTE: The following code prepares infrastructure (image creation, resize handling)
+    // that will be needed when DLSS SDK is integrated, but currently just passes through
+    // the input since actual DLSS evaluation is not yet implemented.
+    
+    // Placeholder implementation framework:
     // 1. Would need to initialize DLSS feature with Streamline SDK
     // 2. Would need to evaluate DLSS with motion vectors, depth buffer, etc.
     // 3. Would need to handle frame generation for DLSS 4.5
@@ -67,8 +70,8 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, vk::ImageView input,
         CreateImages(img);
     }
 
-    // In a real implementation, DLSS upscaling would happen here
-    // For now, return input as-is
+    // When DLSS SDK is integrated, the upscaled result would be written to img.output_image
+    // and we would return img.output_image_view.get() instead of input
     return input;
 }
 
