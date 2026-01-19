@@ -128,6 +128,11 @@ Presenter::Presenter(Frontend::WindowSDL& window_, AmdGpu::Liverpool* liverpool_
     fsr_settings.use_rcas = Config::getRcasEnabled();
     fsr_settings.rcas_attenuation = static_cast<float>(Config::getRcasAttenuation() / 1000.f);
 
+    dlss_settings.enable = Config::getDlssEnabled();
+    dlss_settings.quality = static_cast<HostPasses::DlssPass::Quality>(Config::getDlssQuality());
+    dlss_settings.frame_generation = Config::getDlssFrameGenEnabled();
+
+    dlss_pass.Create(device, instance.GetAllocator(), num_images);
     fsr_pass.Create(device, instance.GetAllocator(), num_images);
     pp_pass.Create(device, swapchain.GetSurfaceFormat().format);
 
@@ -336,8 +341,14 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
     const vk::Extent2D image_size = {image.info.size.width, image.info.size.height};
     expected_ratio = static_cast<float>(image_size.width) / static_cast<float>(image_size.height);
 
-    image_view = fsr_pass.Render(cmdbuf, image_view, image_size, {frame->width, frame->height},
-                                 fsr_settings, frame->is_hdr);
+    // Try DLSS first if enabled and available, otherwise use FSR
+    if (dlss_settings.enable && dlss_pass.IsAvailable()) {
+        image_view = dlss_pass.Render(cmdbuf, image_view, image_size, {frame->width, frame->height},
+                                      dlss_settings, frame->is_hdr);
+    } else {
+        image_view = fsr_pass.Render(cmdbuf, image_view, image_size, {frame->width, frame->height},
+                                     fsr_settings, frame->is_hdr);
+    }
     pp_pass.Render(cmdbuf, image_view, image_size, *frame, pp_settings);
 
     DebugState.game_resolution = {image_size.width, image_size.height};

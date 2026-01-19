@@ -180,6 +180,9 @@ static ConfigEntry<bool> isHDRAllowed(false);
 static ConfigEntry<bool> fsrEnabled(false);
 static ConfigEntry<bool> rcasEnabled(true);
 static ConfigEntry<int> rcasAttenuation(250);
+static ConfigEntry<bool> dlssEnabled(false);
+static ConfigEntry<int> dlssQuality(2); // 0=Performance, 1=Balanced, 2=Quality, 3=Ultra Performance
+static ConfigEntry<bool> dlssFrameGenEnabled(false);
 
 // Vulkan
 static ConfigEntry<s32> gpuId(-1);
@@ -832,6 +835,30 @@ void setRcasAttenuation(int value, bool is_game_specific) {
     rcasAttenuation.set(value, is_game_specific);
 }
 
+bool getDlssEnabled() {
+    return dlssEnabled.get();
+}
+
+void setDlssEnabled(bool enable, bool is_game_specific) {
+    dlssEnabled.set(enable, is_game_specific);
+}
+
+int getDlssQuality() {
+    return dlssQuality.get();
+}
+
+void setDlssQuality(int quality, bool is_game_specific) {
+    dlssQuality.set(quality, is_game_specific);
+}
+
+bool getDlssFrameGenEnabled() {
+    return dlssFrameGenEnabled.get();
+}
+
+void setDlssFrameGenEnabled(bool enable, bool is_game_specific) {
+    dlssFrameGenEnabled.set(enable, is_game_specific);
+}
+
 int getUsbDeviceBackend() {
     return usbDeviceBackend.get();
 }
@@ -930,6 +957,9 @@ void load(const std::filesystem::path& path, bool is_game_specific) {
         fsrEnabled.setFromToml(gpu, "fsrEnabled", is_game_specific);
         rcasEnabled.setFromToml(gpu, "rcasEnabled", is_game_specific);
         rcasAttenuation.setFromToml(gpu, "rcasAttenuation", is_game_specific);
+        dlssEnabled.setFromToml(gpu, "dlssEnabled", is_game_specific);
+        dlssQuality.setFromToml(gpu, "dlssQuality", is_game_specific);
+        dlssFrameGenEnabled.setFromToml(gpu, "dlssFrameGenEnabled", is_game_specific);
     }
 
     if (data.contains("Vulkan")) {
@@ -1103,6 +1133,9 @@ void save(const std::filesystem::path& path, bool is_game_specific) {
     fsrEnabled.setTomlValue(data, "GPU", "fsrEnabled", is_game_specific);
     rcasEnabled.setTomlValue(data, "GPU", "rcasEnabled", is_game_specific);
     rcasAttenuation.setTomlValue(data, "GPU", "rcasAttenuation", is_game_specific);
+    dlssEnabled.setTomlValue(data, "GPU", "dlssEnabled", is_game_specific);
+    dlssQuality.setTomlValue(data, "GPU", "dlssQuality", is_game_specific);
+    dlssFrameGenEnabled.setTomlValue(data, "GPU", "dlssFrameGenEnabled", is_game_specific);
     directMemoryAccessEnabled.setTomlValue(data, "GPU", "directMemoryAccess", is_game_specific);
 
     gpuId.setTomlValue(data, "Vulkan", "gpuId", is_game_specific);
@@ -1235,6 +1268,9 @@ void setDefaultValues(bool is_game_specific) {
     fsrEnabled.set(true, is_game_specific);
     rcasEnabled.set(true, is_game_specific);
     rcasAttenuation.set(250, is_game_specific);
+    dlssEnabled.set(false, is_game_specific);
+    dlssQuality.set(2, is_game_specific);
+    dlssFrameGenEnabled.set(false, is_game_specific);
 
     // GS - Vulkan
     gpuId.set(-1, is_game_specific);
