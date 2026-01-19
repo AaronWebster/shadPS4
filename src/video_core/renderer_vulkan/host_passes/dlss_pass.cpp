@@ -84,8 +84,8 @@ void DlssPass::InitializeStreamline() {
     prefs.allocateCallback = nullptr;
     prefs.releaseCallback = nullptr;
     prefs.logMessageCallback = nullptr;
-    prefs.flags = sl::PreferenceFlags::eDisableCLStateTracking | 
-                  sl::PreferenceFlags::eAllowOTA | 
+    prefs.flags = sl::PreferenceFlags::eDisableCLStateTracking |
+                  sl::PreferenceFlags::eAllowOTA |
                   sl::PreferenceFlags::eLoadDownloadedPlugins |
                   sl::PreferenceFlags::eUseFrameBasedResourceTagging;
 
@@ -173,19 +173,7 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, const RenderInputs& inp
         return inputs.color_input;
     }
 
-    // Prepare output infrastructure
-    if (inputs.output_size != cur_size) {
-        ResizeAndInvalidate(inputs.output_size.width, inputs.output_size.height);
-    }
-
-    auto& img = available_imgs[cur_image];
-    if (++cur_image >= available_imgs.size()) {
-        cur_image = 0;
-    }
-
-    if (img.dirty) {
-        CreateImages(img);
-    }
+    PrepareOutputImage(inputs.output_size);
 
     // Setup DLSS options
     sl::DLSSOptions dlss_options{};
@@ -203,8 +191,7 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, const RenderInputs& inp
 
     // Get a new frame token
     sl::FrameToken* frame_token = nullptr;
-    uint32_t current_frame_index = frame_index;
-    sl::Result result = slGetNewFrameToken(&frame_token, &current_frame_index);
+    sl::Result result = slGetNewFrameToken(&frame_token, &frame_index);
     if (result != sl::Result::eOk || !frame_token) {
         LOG_ERROR(Render_Vulkan, "Failed to get frame token: {}", static_cast<int>(result));
         return inputs.color_input;
@@ -235,20 +222,7 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, const RenderInputs& inp
     frame_index++;
     return inputs.color_input;
 #else
-    // Prepare output infrastructure
-    if (inputs.output_size != cur_size) {
-        ResizeAndInvalidate(inputs.output_size.width, inputs.output_size.height);
-    }
-
-    auto& img = available_imgs[cur_image];
-    if (++cur_image >= available_imgs.size()) {
-        cur_image = 0;
-    }
-
-    if (img.dirty) {
-        CreateImages(img);
-    }
-
+    PrepareOutputImage(inputs.output_size);
     frame_index++;
 
     // Non-Windows platforms don't support DLSS
@@ -267,6 +241,22 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, vk::ImageView input,
     inputs.hdr = hdr;
     
     return Render(cmdbuf, inputs, settings);
+}
+
+void DlssPass::PrepareOutputImage(const vk::Extent2D& output_size) {
+    // Prepare output infrastructure
+    if (output_size != cur_size) {
+        ResizeAndInvalidate(output_size.width, output_size.height);
+    }
+
+    auto& img = available_imgs[cur_image];
+    if (++cur_image >= available_imgs.size()) {
+        cur_image = 0;
+    }
+
+    if (img.dirty) {
+        CreateImages(img);
+    }
 }
 
 void DlssPass::ResizeAndInvalidate(u32 width, u32 height) {

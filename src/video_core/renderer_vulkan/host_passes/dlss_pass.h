@@ -66,6 +66,7 @@ private:
 
     void ResizeAndInvalidate(u32 width, u32 height);
     void CreateImages(Img& img) const;
+    void PrepareOutputImage(const vk::Extent2D& output_size);
 
     // Streamline SDK initialization
     void InitializeStreamline();
