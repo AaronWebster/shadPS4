@@ -8,6 +8,8 @@
 #include "video_core/renderer_vulkan/host_passes/dlss_pass.h"
 #include "video_core/renderer_vulkan/vk_platform.h"
 
+#include <vk_mem_alloc.h>
+
 #ifdef _WIN32
 // Include Streamline SDK headers only on Windows
 #include <sl.h>
@@ -217,9 +219,9 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, const RenderInputs& inp
 
     sl::Resource colorInput{};
     colorInput.type = sl::ResourceType::eTex2d;
-    colorInput.native = static_cast<VkImage>(inputs.color_image);
-    colorInput.memory = static_cast<VkDeviceMemory>(inputs.color_memory);
-    colorInput.view = static_cast<VkImageView>(inputs.color_input);
+    colorInput.native = VkImage(inputs.color_image);
+    colorInput.memory = VkDeviceMemory(inputs.color_memory);
+    colorInput.view = VkImageView(inputs.color_input);
     colorInput.state = sl::ResourceState::eTextureRead;
     colorInput.extent = {inputs.input_size.width, inputs.input_size.height, 1};
     
@@ -229,8 +231,8 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, const RenderInputs& inp
     auto& output_img = available_imgs[cur_image];
     sl::Resource colorOutput{};
     colorOutput.type = sl::ResourceType::eTex2d;
-    colorOutput.native = static_cast<VkImage>(output_img.output_image.image);
-    colorOutput.view = static_cast<VkImageView>(output_img.output_image_view.get());
+    colorOutput.native = VkImage(output_img.output_image.image);
+    colorOutput.view = VkImageView(output_img.output_image_view.get());
     colorOutput.state = sl::ResourceState::eTextureWrite;
     colorOutput.extent = {inputs.output_size.width, inputs.output_size.height, 1};
     
@@ -239,7 +241,7 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, const RenderInputs& inp
         VmaAllocationInfo alloc_info{};
         vmaGetAllocationInfo(output_img.output_image.allocator, 
                             output_img.output_image.allocation, &alloc_info);
-        colorOutput.memory = static_cast<VkDeviceMemory>(alloc_info.deviceMemory);
+        colorOutput.memory = VkDeviceMemory(alloc_info.deviceMemory);
     }
     
     tags.push_back({sl::kBufferTypeScalingOutputColor, colorOutput});
@@ -248,9 +250,9 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, const RenderInputs& inp
     if (inputs.motion_vectors && inputs.motion_vectors_image) {
         sl::Resource motionVectors{};
         motionVectors.type = sl::ResourceType::eTex2d;
-        motionVectors.native = static_cast<VkImage>(inputs.motion_vectors_image);
-        motionVectors.memory = static_cast<VkDeviceMemory>(inputs.motion_vectors_memory);
-        motionVectors.view = static_cast<VkImageView>(inputs.motion_vectors);
+        motionVectors.native = VkImage(inputs.motion_vectors_image);
+        motionVectors.memory = VkDeviceMemory(inputs.motion_vectors_memory);
+        motionVectors.view = VkImageView(inputs.motion_vectors);
         motionVectors.state = sl::ResourceState::eTextureRead;
         motionVectors.extent = {inputs.input_size.width, inputs.input_size.height, 1};
         
@@ -262,9 +264,9 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, const RenderInputs& inp
     if (inputs.depth_buffer && inputs.depth_image) {
         sl::Resource depth{};
         depth.type = sl::ResourceType::eTex2d;
-        depth.native = static_cast<VkImage>(inputs.depth_image);
-        depth.memory = static_cast<VkDeviceMemory>(inputs.depth_memory);
-        depth.view = static_cast<VkImageView>(inputs.depth_buffer);
+        depth.native = VkImage(inputs.depth_image);
+        depth.memory = VkDeviceMemory(inputs.depth_memory);
+        depth.view = VkImageView(inputs.depth_buffer);
         depth.state = sl::ResourceState::eTextureRead;
         depth.extent = {inputs.input_size.width, inputs.input_size.height, 1};
         
@@ -274,7 +276,7 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, const RenderInputs& inp
 
     // Tag all resources with Streamline
     result = slSetTag(viewport, tags.data(), static_cast<uint32_t>(tags.size()), 
-                     static_cast<VkCommandBuffer>(cmdbuf));
+                     VkCommandBuffer(cmdbuf));
     if (result != sl::Result::eOk) {
         LOG_ERROR(Render_Vulkan, "Failed to tag resources for DLSS: {}", static_cast<int>(result));
         frame_index++;
