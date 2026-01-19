@@ -268,3 +268,24 @@ add_subdirectory(json)
 
 # miniz
 add_subdirectory(miniz)
+
+# NVIDIA Streamline SDK (for DLSS)
+if (WIN32)
+    # Only available on Windows
+    set(STREAMLINE_FEATURE_DLSS_SR ON CACHE BOOL "" FORCE)
+    set(STREAMLINE_FEATURE_DLSS_FG ON CACHE BOOL "" FORCE)
+    set(STREAMLINE_IMPORT_AS_INTERFACE ON CACHE BOOL "" FORCE)
+    if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/streamline/CMakeLists.txt")
+        add_subdirectory(streamline)
+    else()
+        # Create a minimal interface library when Streamline is not available
+        add_library(streamline INTERFACE)
+        target_include_directories(streamline INTERFACE streamline/include)
+    endif()
+else()
+    # For non-Windows platforms, create a stub interface library
+    add_library(streamline INTERFACE)
+    if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/streamline/include")
+        target_include_directories(streamline INTERFACE streamline/include)
+    endif()
+endif()

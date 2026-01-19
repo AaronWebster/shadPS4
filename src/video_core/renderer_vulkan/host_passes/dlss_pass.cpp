@@ -3,25 +3,36 @@
 
 #include "common/assert.h"
 #include "common/config.h"
+#include "common/logging/log.h"
 #include "core/debug_state.h"
 #include "video_core/renderer_vulkan/host_passes/dlss_pass.h"
 #include "video_core/renderer_vulkan/vk_platform.h"
+
+#ifdef _WIN32
+// Include Streamline SDK headers only on Windows
+#include <sl.h>
+#include <sl_dlss.h>
+#include <sl_dlss_g.h>
+#endif
 
 namespace Vulkan::HostPasses {
 
 void DlssPass::Create(vk::Device device, VmaAllocator allocator, u32 num_images, bool is_nvidia_gpu) {
     this->device = device;
+    this->allocator = allocator;
     this->num_images = num_images;
 
     // DLSS requires NVIDIA GPU and Streamline SDK integration
     // For now, only check if it's NVIDIA hardware
     is_available = is_nvidia_gpu;
 
-    // TODO: When NVIDIA Streamline SDK is integrated:
-    // 1. Initialize Streamline SDK
-    // 2. Check for DLSS feature availability
-    // 3. Query supported quality modes
-    // 4. Initialize DLSS with default settings
+#ifdef _WIN32
+    if (is_nvidia_gpu) {
+        InitializeStreamline(device);
+    }
+#else
+    LOG_WARNING(Render_Vulkan, "DLSS is only supported on Windows with NVIDIA GPUs");
+#endif
 
     available_imgs.resize(num_images);
     for (int i = 0; i < num_images; ++i) {
@@ -31,34 +42,69 @@ void DlssPass::Create(vk::Device device, VmaAllocator allocator, u32 num_images,
     }
 }
 
-vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, vk::ImageView input,
-                               vk::Extent2D input_size, vk::Extent2D output_size, Settings settings,
-                               bool hdr) {
+void DlssPass::InitializeStreamline(vk::Device device) {
+#ifdef _WIN32
+    if (streamline_initialized) {
+        return;
+    }
+
+    LOG_INFO(Render_Vulkan, "Initializing NVIDIA Streamline SDK for DLSS 4.5");
+
+    // TODO: Complete Streamline initialization
+    // This requires:
+    // 1. sl::Preferences setup with application info
+    // 2. sl::init() call with Vulkan device handles
+    // 3. Feature registration for DLSS-SR and DLSS-G
+    // 4. Query supported quality modes and capabilities
+    
+    // For now, mark as not initialized until full implementation
+    streamline_initialized = false;
+    
+    LOG_WARNING(Render_Vulkan, "Streamline SDK initialization requires additional setup - DLSS will use passthrough mode");
+#endif
+}
+
+void DlssPass::ShutdownStreamline() {
+#ifdef _WIN32
+    if (streamline_initialized) {
+        // TODO: Call sl::shutdown() when fully implemented
+        streamline_initialized = false;
+        LOG_INFO(Render_Vulkan, "Streamline SDK shutdown");
+    }
+#endif
+}
+
+vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, const RenderInputs& inputs, Settings settings) {
     // If DLSS is not enabled or not available, pass through input
     if (!settings.enable || !is_available) {
-        return input;
+        return inputs.color_input;
     }
 
     // If no upscaling is needed (input >= output), pass through
-    if (input_size.width >= output_size.width && input_size.height >= output_size.height) {
-        return input;
+    if (inputs.input_size.width >= inputs.output_size.width && 
+        inputs.input_size.height >= inputs.output_size.height) {
+        return inputs.color_input;
     }
 
-    // TODO: Implement actual DLSS upscaling
-    // This requires integration with NVIDIA Streamline SDK
-    // For now, this is a placeholder that returns the input unchanged
+#ifdef _WIN32
+    if (streamline_initialized) {
+        // TODO: Implement actual DLSS evaluation with Streamline SDK
+        // This would involve:
+        // 1. Setting up sl::Resource tags for input textures (color, motion vectors, depth)
+        // 2. Configuring DLSS constants (quality mode, sharpness, jitter)
+        // 3. Calling sl::evaluateFeature with kFeatureDLSS
+        // 4. For frame generation (DLSS 4.5), also evaluate kFeatureDLSS_G
+        // 5. Proper synchronization and resource state transitions
+        
+        LOG_DEBUG(Render_Vulkan, "DLSS evaluation with motion vectors: {}, depth: {}", 
+                  inputs.motion_vectors ? "yes" : "no",
+                  inputs.depth_buffer ? "yes" : "no");
+    }
+#endif
     
-    // NOTE: The following code prepares infrastructure (image creation, resize handling)
-    // that will be needed when DLSS SDK is integrated, but currently just passes through
-    // the input since actual DLSS evaluation is not yet implemented.
-    
-    // Placeholder implementation framework:
-    // 1. Would need to initialize DLSS feature with Streamline SDK
-    // 2. Would need to evaluate DLSS with motion vectors, depth buffer, etc.
-    // 3. Would need to handle frame generation for DLSS 4.5
-    
-    if (output_size != cur_size) {
-        ResizeAndInvalidate(output_size.width, output_size.height);
+    // Prepare output infrastructure
+    if (inputs.output_size != cur_size) {
+        ResizeAndInvalidate(inputs.output_size.width, inputs.output_size.height);
     }
 
     auto& img = available_imgs[cur_image];
@@ -70,9 +116,25 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, vk::ImageView input,
         CreateImages(img);
     }
 
+    frame_index++;
+
     // When DLSS SDK is integrated, the upscaled result would be written to img.output_image
-    // and we would return img.output_image_view.get() instead of input
-    return input;
+    // and we would return img.output_image_view.get() instead of the input
+    // For now, return input as passthrough
+    return inputs.color_input;
+}
+
+// Legacy interface for backward compatibility
+vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, vk::ImageView input,
+                                vk::Extent2D input_size, vk::Extent2D output_size, 
+                                Settings settings, bool hdr) {
+    RenderInputs inputs{};
+    inputs.color_input = input;
+    inputs.input_size = input_size;
+    inputs.output_size = output_size;
+    inputs.hdr = hdr;
+    
+    return Render(cmdbuf, inputs, settings);
 }
 
 void DlssPass::ResizeAndInvalidate(u32 width, u32 height) {

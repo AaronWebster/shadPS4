@@ -24,8 +24,24 @@ public:
         bool frame_generation{false};
     };
 
+    struct RenderInputs {
+        vk::ImageView color_input;
+        vk::ImageView motion_vectors;  // Motion vector buffer (optional)
+        vk::ImageView depth_buffer;    // Depth buffer (optional)
+        vk::Extent2D input_size;
+        vk::Extent2D output_size;
+        bool hdr{false};
+        float jitter_offset_x{0.0f};   // Jitter offset for TAA
+        float jitter_offset_y{0.0f};
+        float sharpness{0.0f};         // Sharpness control (0.0-1.0)
+        bool reset{false};             // Reset accumulation
+    };
+
     void Create(vk::Device device, VmaAllocator allocator, u32 num_images, bool is_nvidia_gpu);
 
+    vk::ImageView Render(vk::CommandBuffer cmdbuf, const RenderInputs& inputs, Settings settings);
+
+    // Legacy interface for backward compatibility
     vk::ImageView Render(vk::CommandBuffer cmdbuf, vk::ImageView input, vk::Extent2D input_size,
                          vk::Extent2D output_size, Settings settings, bool hdr);
 
@@ -45,12 +61,19 @@ private:
     void ResizeAndInvalidate(u32 width, u32 height);
     void CreateImages(Img& img) const;
 
+    // Streamline SDK initialization
+    void InitializeStreamline(vk::Device device);
+    void ShutdownStreamline();
+
     vk::Device device{};
+    VmaAllocator allocator{};
     u32 num_images{};
     bool is_available{false};
+    bool streamline_initialized{false};
 
     vk::Extent2D cur_size{};
     u32 cur_image{};
+    u32 frame_index{0};
     std::vector<Img> available_imgs;
 };
 
