@@ -41,6 +41,10 @@ public:
                 VmaAllocator allocator, u32 num_images, u32 graphics_queue_family,
                 bool is_nvidia_gpu);
 
+    ~DlssPass() {
+        ShutdownStreamline();
+    }
+
     vk::ImageView Render(vk::CommandBuffer cmdbuf, const RenderInputs& inputs, Settings settings);
 
     // Legacy interface for backward compatibility

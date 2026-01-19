@@ -44,6 +44,8 @@ This document describes the integration of NVIDIA DLSS 4.5 (Deep Learning Super 
    - Added frame token management for temporal tracking
    - Quality mode conversion from DlssPass::Quality to sl::DLSSMode
 
+**Note:** The implementation currently operates in passthrough mode until full Vulkan resource tracking is added. Streamline SDK initializes successfully and configures DLSS, but the actual upscaling evaluation requires tracking VkImage and VkDeviceMemory handles alongside ImageViews.
+
 ### 🚧 Requires Binary Artifacts (Not in Git Repository)
 
 The following features require the Streamline SDK binary artifacts which must be downloaded separately from [NVIDIA's GitHub releases](https://github.com/NVIDIA-RTX/Streamline/releases):
