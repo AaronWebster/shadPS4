@@ -78,11 +78,13 @@ The following features require the Streamline SDK binary artifacts which must be
 
 ### ⏳ To Be Implemented (Optional Enhancements)
 
-1. **Complete Vulkan Resource Tracking for DLSS**
+1. **Complete Vulkan Resource Tagging for DLSS**
    - **Location**: `dlss_pass.cpp` Render() method
-   - **Method**: Track VkImage and VkDeviceMemory handles alongside ImageViews
+   - **Status**: VkImage and VkDeviceMemory handles are now tracked in ImageView structure
+   - **Implementation**: Access handles via `image_view->image` and `image_view->memory` for sl::Resource tagging
    - **Purpose**: Enable full resource tagging for sl::evaluateFeature()
-   - **Note**: Current implementation initializes Streamline but uses passthrough mode
+   - **Next Steps**: Implement actual resource tagging and DLSS evaluation using tracked handles
+   - **Note**: Handles are now available; need to implement Streamline resource creation and tagging
 
 2. **Motion Vector Generation**
    - **Location**: Rendering pipeline (likely in `vk_rasterizer.cpp`)

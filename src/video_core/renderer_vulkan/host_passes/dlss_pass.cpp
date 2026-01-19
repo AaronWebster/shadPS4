@@ -206,18 +206,24 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, const RenderInputs& inp
     }
 
     // Tag input color resource
-    // Note: For Vulkan, we need to provide the native image, memory, and view
-    // Since we only have ImageView, we'll use a simplified tagging approach
-    // In a production implementation, these resources would be fully tracked
+    // Note: VkImage and VkDeviceMemory handles are now tracked in ImageView structure
+    // These can be accessed via image_view->image and image_view->memory for Streamline SDK tagging
+    // Example resource tagging (when implementing full DLSS evaluation):
+    // sl::Resource colorInput{};
+    // colorInput.type = sl::ResourceType::eTex2d;
+    // colorInput.native = reinterpret_cast<void*>(VkImage from ImageView);
+    // colorInput.memory = reinterpret_cast<void*>(VkDeviceMemory from ImageView);
+    // colorInput.view = reinterpret_cast<void*>(VkImageView from ImageView);
+    // colorInput.state = sl::ResourceState::eTextureRead;
     std::vector<sl::ResourceTag> tags;
     
-    // For now, return the input as passthrough since we don't have full resource information
-    // A complete implementation would require tracking VkImage and VkDeviceMemory handles
+    // For now, return the input as passthrough until full resource tagging is implemented
+    // VkImage and VkDeviceMemory handles are now available in ImageView for future implementation
     LOG_DEBUG(Render_Vulkan, "DLSS evaluation with motion vectors: {}, depth: {}", 
               inputs.motion_vectors ? "yes" : "no",
               inputs.depth_buffer ? "yes" : "no");
     
-    LOG_WARNING(Render_Vulkan, "DLSS evaluation requires full Vulkan resource tracking - using passthrough mode");
+    LOG_WARNING(Render_Vulkan, "DLSS evaluation resource tagging not yet implemented - using passthrough mode");
     
     frame_index++;
     return inputs.color_input;

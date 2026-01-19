@@ -53,6 +53,8 @@ struct ImageView {
 
     ImageViewInfo info;
     vk::UniqueImageView image_view;
+    vk::Image image{};         // VkImage handle for Streamline SDK resource tagging
+    vk::DeviceMemory memory{}; // VkDeviceMemory handle for Streamline SDK resource tagging
 };
 
 } // namespace VideoCore

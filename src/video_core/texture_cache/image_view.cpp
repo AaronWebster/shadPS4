@@ -9,6 +9,7 @@
 #include "video_core/texture_cache/image_view.h"
 
 #include <magic_enum/magic_enum.hpp>
+#include <vk_mem_alloc.h>
 
 namespace VideoCore {
 
@@ -132,6 +133,17 @@ ImageView::ImageView(const Vulkan::Instance& instance, const ImageViewInfo& info
     ASSERT_MSG(view_result == vk::Result::eSuccess, "Failed to create image view: {}",
                vk::to_string(view_result));
     image_view = std::move(view);
+
+    // Store VkImage and VkDeviceMemory handles for Streamline SDK resource tagging
+    this->image = image.GetImage();
+    
+    // Get VkDeviceMemory from VmaAllocation
+    if (image.backing && image.backing->image.allocation) {
+        VmaAllocationInfo alloc_info{};
+        vmaGetAllocationInfo(image.backing->image.allocator, image.backing->image.allocation, 
+                           &alloc_info);
+        this->memory = vk::DeviceMemory(alloc_info.deviceMemory);
+    }
 
     const auto view_aspect = aspect & vk::ImageAspectFlagBits::eDepth     ? "Depth"
                              : aspect & vk::ImageAspectFlagBits::eStencil ? "Stencil"
