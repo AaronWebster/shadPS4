@@ -132,7 +132,7 @@ Presenter::Presenter(Frontend::WindowSDL& window_, AmdGpu::Liverpool* liverpool_
     dlss_settings.quality = static_cast<HostPasses::DlssPass::Quality>(Config::getDlssQuality());
     dlss_settings.frame_generation = Config::getDlssFrameGenEnabled();
 
-    dlss_pass.Create(device, instance.GetAllocator(), num_images);
+    dlss_pass.Create(device, instance.GetAllocator(), num_images, instance.IsNvidiaDlssSupported());
     fsr_pass.Create(device, instance.GetAllocator(), num_images);
     pp_pass.Create(device, swapchain.GetSurfaceFormat().format);
 

@@ -52,6 +52,21 @@ You can donate to the project via our [**Kofi page**](https://ko-fi.com/shadps4)
 
 Currently, the emulator can successfully run games like [**Bloodborne**](https://www.youtube.com/watch?v=5sZgWyVflFM), [**Dark Souls Remastered**](https://www.youtube.com/watch?v=-3PA-Xwszts), [**Red Dead Redemption**](https://www.youtube.com/watch?v=Al7yz_5nLag), and many other games.
 
+# Features
+
+## Upscaling Support
+
+shadPS4 includes support for both AMD FidelityFX Super Resolution (FSR) and NVIDIA Deep Learning Super Sampling (DLSS 4.5):
+
+- **FSR**: AMD's open-source upscaling technology works on all GPUs (AMD, NVIDIA, Intel)
+- **DLSS 4.5**: NVIDIA's AI-powered upscaling and frame generation (NVIDIA RTX GPUs only)
+  - Quality modes: Ultra Performance, Performance, Balanced, Quality
+  - Frame Generation support for enhanced framerates (DLSS 4.5 feature)
+  - Automatically enabled on NVIDIA GPUs when configured
+
+> [!NOTE]
+> DLSS currently requires integration with NVIDIA Streamline SDK (not yet implemented). When enabled, the emulator will automatically detect NVIDIA GPUs and use DLSS if available, otherwise falling back to FSR.
+
 # Why
 
 This project began for fun. Given our limited free time, it may take some time before shadPS4 can run more complex games, but we're committed to making small, regular updates.

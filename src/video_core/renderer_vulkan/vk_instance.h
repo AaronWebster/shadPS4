@@ -280,6 +280,11 @@ public:
         return properties.deviceID;
     }
 
+    /// Returns true if the GPU is NVIDIA and potentially supports DLSS
+    bool IsNvidiaDlssSupported() const {
+        return driver_id == vk::DriverId::eNvidiaProprietary;
+    }
+
     /// Returns the driver ID.
     vk::DriverId GetDriverID() const {
         return driver_id;

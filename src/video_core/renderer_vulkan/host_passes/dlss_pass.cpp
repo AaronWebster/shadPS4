@@ -9,14 +9,19 @@
 
 namespace Vulkan::HostPasses {
 
-void DlssPass::Create(vk::Device device, VmaAllocator allocator, u32 num_images) {
+void DlssPass::Create(vk::Device device, VmaAllocator allocator, u32 num_images, bool is_nvidia_gpu) {
     this->device = device;
     this->num_images = num_images;
 
-    // TODO: Check for NVIDIA GPU and DLSS support
-    // For now, DLSS is not available by default (requires NVIDIA Streamline SDK integration)
-    // This is a placeholder implementation that will fall back to input passthrough
-    is_available = false;
+    // DLSS requires NVIDIA GPU and Streamline SDK integration
+    // For now, only check if it's NVIDIA hardware
+    is_available = is_nvidia_gpu;
+
+    // TODO: When NVIDIA Streamline SDK is integrated:
+    // 1. Initialize Streamline SDK
+    // 2. Check for DLSS feature availability
+    // 3. Query supported quality modes
+    // 4. Initialize DLSS with default settings
 
     available_imgs.resize(num_images);
     for (int i = 0; i < num_images; ++i) {

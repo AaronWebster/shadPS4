@@ -24,7 +24,7 @@ public:
         bool frame_generation{false};
     };
 
-    void Create(vk::Device device, VmaAllocator allocator, u32 num_images);
+    void Create(vk::Device device, VmaAllocator allocator, u32 num_images, bool is_nvidia_gpu);
 
     vk::ImageView Render(vk::CommandBuffer cmdbuf, vk::ImageView input, vk::Extent2D input_size,
                          vk::Extent2D output_size, Settings settings, bool hdr);
