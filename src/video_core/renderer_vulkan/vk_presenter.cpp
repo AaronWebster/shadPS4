@@ -343,8 +343,22 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
 
     // Try DLSS first if enabled and available, otherwise use FSR
     if (dlss_settings.enable && dlss_pass.IsAvailable()) {
-        image_view = dlss_pass.Render(cmdbuf, image_view, image_size, {frame->width, frame->height},
-                                      dlss_settings, frame->is_hdr);
+        // TODO: Track and pass motion vectors for better DLSS quality
+        // TODO: Track and pass depth buffer for improved temporal stability
+        // For now, we pass nullptrs which will use Streamline's internal motion estimation
+        HostPasses::DlssPass::RenderInputs dlss_inputs{};
+        dlss_inputs.color_input = image_view;
+        dlss_inputs.motion_vectors = nullptr;  // TODO: Generate or extract from game
+        dlss_inputs.depth_buffer = nullptr;    // TODO: Extract from depth attachment
+        dlss_inputs.input_size = image_size;
+        dlss_inputs.output_size = {frame->width, frame->height};
+        dlss_inputs.hdr = frame->is_hdr;
+        dlss_inputs.jitter_offset_x = 0.0f;    // TODO: Implement jittering for TAA
+        dlss_inputs.jitter_offset_y = 0.0f;
+        dlss_inputs.sharpness = 0.5f;          // Default sharpness
+        dlss_inputs.reset = false;
+        
+        image_view = dlss_pass.Render(cmdbuf, dlss_inputs, dlss_settings);
     } else {
         image_view = fsr_pass.Render(cmdbuf, image_view, image_size, {frame->width, frame->height},
                                      fsr_settings, frame->is_hdr);

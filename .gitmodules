@@ -123,3 +123,6 @@
 [submodule "externals/aacdec/fdk-aac"]
 	path = externals/aacdec/fdk-aac
 	url = https://android.googlesource.com/platform/external/aac
+[submodule "externals/streamline"]
+	path = externals/streamline
+	url = https://github.com/NVIDIA-RTX/Streamline.git
