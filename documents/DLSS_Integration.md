@@ -44,24 +44,21 @@ This document describes the integration of NVIDIA DLSS 4.5 (Deep Learning Super 
    - Added frame token management for temporal tracking
    - Quality mode conversion from DlssPass::Quality to sl::DLSSMode
 
-**Note:** The implementation currently operates in passthrough mode until full Vulkan resource tracking is added. Streamline SDK initializes successfully and configures DLSS, but the actual upscaling evaluation requires tracking VkImage and VkDeviceMemory handles alongside ImageViews.
+6. **Vulkan Resource Tagging and DLSS Evaluation**
+   - Implemented VkImage and VkDeviceMemory handle tracking in ImageView structure
+   - Extended RenderInputs to accept image and memory handles alongside ImageViews
+   - Implemented sl::Resource creation from tracked Vulkan handles
+   - Implemented resource tagging with slSetTag for color input/output, motion vectors, and depth
+   - Implemented DLSS evaluation using slEvaluateFeature
+   - Returns upscaled output from DLSS when successful
+
+**Note:** DLSS will only work when the Streamline SDK binary artifacts are present. The implementation is complete and will perform actual upscaling when the required DLLs are available.
 
 ### 🚧 Requires Binary Artifacts (Not in Git Repository)
 
-The following features require the Streamline SDK binary artifacts which must be downloaded separately from [NVIDIA's GitHub releases](https://github.com/NVIDIA-RTX/Streamline/releases):
+The following runtime binaries are required for DLSS to function, which must be downloaded separately from [NVIDIA's GitHub releases](https://github.com/NVIDIA-RTX/Streamline/releases):
 
-1. **Vulkan Resource Tagging for DLSS Evaluation**
-   ```cpp
-   // In Render():
-   // - Create sl::Resource objects with VkImage, VkDeviceMemory, and VkImageView
-   // - Tag resources with appropriate buffer types (color input/output, motion vectors, depth)
-   // - Call sl::evaluateFeature(sl::kFeatureDLSS) with tagged resources
-   // - For frame generation, evaluate sl::kFeatureDLSS_G
-   // Current implementation: Streamline is initialized but resource tagging requires 
-   // full tracking of Vulkan image handles, which is not yet implemented.
-   ```
-
-2. **Required DLLs (Windows Only)**
+**Required DLLs (Windows Only)**
    - `sl.interposer.dll` - Streamline interposer library
    - `sl.common.dll` - Common Streamline functionality
    - `sl.dlss.dll` - DLSS Super Resolution plugin
@@ -78,36 +75,31 @@ The following features require the Streamline SDK binary artifacts which must be
 
 ### ⏳ To Be Implemented (Optional Enhancements)
 
-1. **Complete Vulkan Resource Tagging for DLSS**
-   - **Location**: `dlss_pass.cpp` Render() method
-   - **Status**: VkImage and VkDeviceMemory handles are now tracked in ImageView structure
-   - **Implementation**: Access handles via `image_view->image` and `image_view->memory` for sl::Resource tagging
-   - **Purpose**: Enable full resource tagging for sl::evaluateFeature()
-   - **Next Steps**: Implement actual resource tagging and DLSS evaluation using tracked handles
-   - **Note**: Handles are now available; need to implement Streamline resource creation and tagging
-
-2. **Motion Vector Generation**
+1. **Motion Vector Generation**
    - **Location**: Rendering pipeline (likely in `vk_rasterizer.cpp`)
    - **Method**: Track camera/object transformations between frames
    - **Format**: 2-component float texture with screen-space velocity
    - **Alternative**: Use Streamline's internal motion estimation (current approach, lower quality)
    - **Note**: Optional - DLSS works without explicit motion vectors but quality improves with them
 
-3. **Depth Buffer Extraction**
+2. **Depth Buffer Extraction**
    - **Location**: `vk_presenter.cpp` or `vk_rasterizer.cpp`
    - **Method**: Extract depth attachment from current render pass
    - **Format**: Single-channel depth texture
    - **Note**: Optional - PS4 depth buffers are already tracked in `regs.depth_buffer`
 
-4. **TAA Jittering**
+3. **TAA Jittering**
    - **Location**: Projection matrix generation
    - **Method**: Apply sub-pixel jitter offsets to projection matrix
    - **Pattern**: Halton or custom sequence for temporal stability
    - **Purpose**: Improves DLSS quality through temporal supersampling
    - **Note**: Optional enhancement for quality improvement
 
-4. **Platform Support**
-   - Currently Windows-only due to Streamline SDK limitations
+4. **DLSS Frame Generation (DLSS-G)**
+   - **Method**: Use sl::kFeatureDLSS_G for frame generation
+   - **Note**: Requires DLSS 3.5+ compatible GPU (RTX 40-series or newer)
+
+5. **Platform Support**
    - Linux support requires custom Vulkan integration without Streamline
    - macOS support not available (DLSS is NVIDIA RTX specific)
 
