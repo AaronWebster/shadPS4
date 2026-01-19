@@ -211,7 +211,7 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, const RenderInputs& inp
     std::vector<sl::ResourceTag> tags;
 
     // Tag color input buffer
-    if (!inputs.color_image) {
+    if (static_cast<VkImage>(inputs.color_image) == VK_NULL_HANDLE) {
         LOG_WARNING(Render_Vulkan, "Color input image handle not available, using passthrough mode");
         frame_index++;
         return inputs.color_input;
@@ -229,25 +229,30 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, const RenderInputs& inp
 
     // Tag output buffer
     auto& output_img = available_imgs[cur_image];
+    
+    // Get device memory for output image
+    if (!output_img.output_image.allocation) {
+        LOG_ERROR(Render_Vulkan, "Output image allocation not available, using passthrough mode");
+        frame_index++;
+        return inputs.color_input;
+    }
+    
+    VmaAllocationInfo alloc_info{};
+    vmaGetAllocationInfo(output_img.output_image.allocator, 
+                        output_img.output_image.allocation, &alloc_info);
+    
     sl::Resource colorOutput{};
     colorOutput.type = sl::ResourceType::eTex2d;
     colorOutput.native = reinterpret_cast<void*>(static_cast<VkImage>(output_img.output_image.image));
     colorOutput.view = reinterpret_cast<void*>(static_cast<VkImageView>(output_img.output_image_view.get()));
+    colorOutput.memory = reinterpret_cast<void*>(alloc_info.deviceMemory);
     colorOutput.state = sl::ResourceState::eTextureWrite;
     colorOutput.extent = {inputs.output_size.width, inputs.output_size.height, 1};
-    
-    // Get device memory for output image
-    if (output_img.output_image.allocation) {
-        VmaAllocationInfo alloc_info{};
-        vmaGetAllocationInfo(output_img.output_image.allocator, 
-                            output_img.output_image.allocation, &alloc_info);
-        colorOutput.memory = reinterpret_cast<void*>(alloc_info.deviceMemory);
-    }
     
     tags.push_back({sl::kBufferTypeScalingOutputColor, colorOutput});
 
     // Tag motion vectors if provided
-    if (inputs.motion_vectors && inputs.motion_vectors_image) {
+    if (inputs.motion_vectors && static_cast<VkImage>(inputs.motion_vectors_image) != VK_NULL_HANDLE) {
         sl::Resource motionVectors{};
         motionVectors.type = sl::ResourceType::eTex2d;
         motionVectors.native = reinterpret_cast<void*>(static_cast<VkImage>(inputs.motion_vectors_image));
@@ -261,7 +266,7 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, const RenderInputs& inp
     }
 
     // Tag depth buffer if provided
-    if (inputs.depth_buffer && inputs.depth_image) {
+    if (inputs.depth_buffer && static_cast<VkImage>(inputs.depth_image) != VK_NULL_HANDLE) {
         sl::Resource depth{};
         depth.type = sl::ResourceType::eTex2d;
         depth.native = reinterpret_cast<void*>(static_cast<VkImage>(inputs.depth_image));
@@ -276,7 +281,7 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, const RenderInputs& inp
 
     // Tag all resources with Streamline
     result = slSetTag(viewport, tags.data(), static_cast<uint32_t>(tags.size()), 
-                     VkCommandBuffer(cmdbuf));
+                     static_cast<VkCommandBuffer>(cmdbuf));
     if (result != sl::Result::eOk) {
         LOG_ERROR(Render_Vulkan, "Failed to tag resources for DLSS: {}", static_cast<int>(result));
         frame_index++;
