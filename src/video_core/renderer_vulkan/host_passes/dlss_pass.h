@@ -26,15 +26,21 @@ public:
 
     struct RenderInputs {
         vk::ImageView color_input;
-        vk::ImageView motion_vectors;  // Motion vector buffer (optional)
-        vk::ImageView depth_buffer;    // Depth buffer (optional)
+        vk::Image color_image{};           // VkImage handle for resource tagging
+        vk::DeviceMemory color_memory{};   // VkDeviceMemory handle for resource tagging
+        vk::ImageView motion_vectors;      // Motion vector buffer (optional)
+        vk::Image motion_vectors_image{};
+        vk::DeviceMemory motion_vectors_memory{};
+        vk::ImageView depth_buffer;        // Depth buffer (optional)
+        vk::Image depth_image{};
+        vk::DeviceMemory depth_memory{};
         vk::Extent2D input_size;
         vk::Extent2D output_size;
         bool hdr{false};
-        float jitter_offset_x{0.0f};   // Jitter offset for TAA
+        float jitter_offset_x{0.0f};       // Jitter offset for TAA
         float jitter_offset_y{0.0f};
-        float sharpness{0.0f};         // Sharpness control (0.0-1.0)
-        bool reset{false};             // Reset accumulation
+        float sharpness{0.0f};             // Sharpness control (0.0-1.0)
+        bool reset{false};                 // Reset accumulation
     };
 
     void Create(vk::Device device, vk::Instance instance, vk::PhysicalDevice physical_device,

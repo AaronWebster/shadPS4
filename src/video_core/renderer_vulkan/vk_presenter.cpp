@@ -337,7 +337,8 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
     view_info.mapping.a = vk::ComponentSwizzle::eOne;
 
     auto& image = texture_cache.GetImage(image_id);
-    auto image_view = *image.FindView(view_info).image_view;
+    auto& full_image_view = image.FindView(view_info);
+    auto image_view = *full_image_view.image_view;
     image.Transit(vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits2::eShaderRead, {});
 
     const vk::Extent2D image_size = {image.info.size.width, image.info.size.height};
@@ -351,6 +352,8 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
         // for improved DLSS quality and temporal stability.
         HostPasses::DlssPass::RenderInputs dlss_inputs{};
         dlss_inputs.color_input = image_view;
+        dlss_inputs.color_image = full_image_view.image;
+        dlss_inputs.color_memory = full_image_view.memory;
         dlss_inputs.motion_vectors = nullptr;  // Optional: Extract from rendering pipeline
         dlss_inputs.depth_buffer = nullptr;    // Optional: Extract from depth attachment
         dlss_inputs.input_size = image_size;

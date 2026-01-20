@@ -8,6 +8,8 @@
 #include "video_core/renderer_vulkan/host_passes/dlss_pass.h"
 #include "video_core/renderer_vulkan/vk_platform.h"
 
+#include <vk_mem_alloc.h>
+
 #ifdef _WIN32
 // Include Streamline SDK headers only on Windows
 #include <sl.h>
@@ -205,28 +207,103 @@ vk::ImageView DlssPass::Render(vk::CommandBuffer cmdbuf, const RenderInputs& inp
         return inputs.color_input;
     }
 
-    // Tag input color resource
-    // Note: VkImage and VkDeviceMemory handles are now tracked in ImageView structure
-    // These can be accessed via image_view->image and image_view->memory for Streamline SDK tagging
-    // Example resource tagging (when implementing full DLSS evaluation):
-    // sl::Resource colorInput{};
-    // colorInput.type = sl::ResourceType::eTex2d;
-    // colorInput.native = reinterpret_cast<void*>(VkImage from ImageView);
-    // colorInput.memory = reinterpret_cast<void*>(VkDeviceMemory from ImageView);
-    // colorInput.view = reinterpret_cast<void*>(VkImageView from ImageView);
-    // colorInput.state = sl::ResourceState::eTextureRead;
+    // Create and tag resources for DLSS evaluation
     std::vector<sl::ResourceTag> tags;
+
+    // Tag color input buffer
+    if (static_cast<VkImage>(inputs.color_image) == VK_NULL_HANDLE) {
+        LOG_WARNING(Render_Vulkan, "Color input image handle not available, using passthrough mode");
+        frame_index++;
+        return inputs.color_input;
+    }
+
+    sl::Resource colorInput{};
+    colorInput.type = sl::ResourceType::eTex2d;
+    colorInput.native = reinterpret_cast<void*>(static_cast<VkImage>(inputs.color_image));
+    colorInput.memory = reinterpret_cast<void*>(static_cast<VkDeviceMemory>(inputs.color_memory));
+    colorInput.view = reinterpret_cast<void*>(static_cast<VkImageView>(inputs.color_input));
+    colorInput.state = sl::ResourceState::eTextureRead;
+    colorInput.extent = {inputs.input_size.width, inputs.input_size.height, 1};
     
-    // For now, return the input as passthrough until full resource tagging is implemented
-    // VkImage and VkDeviceMemory handles are now available in ImageView for future implementation
-    LOG_DEBUG(Render_Vulkan, "DLSS evaluation with motion vectors: {}, depth: {}", 
-              inputs.motion_vectors ? "yes" : "no",
-              inputs.depth_buffer ? "yes" : "no");
+    tags.push_back({sl::kBufferTypeScalingInputColor, colorInput});
+
+    // Tag output buffer
+    auto& output_img = available_imgs[cur_image];
     
-    LOG_WARNING(Render_Vulkan, "DLSS evaluation resource tagging not yet implemented - using passthrough mode");
+    // Get device memory for output image
+    if (!output_img.output_image.allocation) {
+        LOG_ERROR(Render_Vulkan, "Output image allocation not available, using passthrough mode");
+        frame_index++;
+        return inputs.color_input;
+    }
     
+    VmaAllocationInfo alloc_info{};
+    vmaGetAllocationInfo(output_img.output_image.allocator, 
+                        output_img.output_image.allocation, &alloc_info);
+    
+    sl::Resource colorOutput{};
+    colorOutput.type = sl::ResourceType::eTex2d;
+    colorOutput.native = reinterpret_cast<void*>(static_cast<VkImage>(output_img.output_image.image));
+    colorOutput.view = reinterpret_cast<void*>(static_cast<VkImageView>(output_img.output_image_view.get()));
+    colorOutput.memory = reinterpret_cast<void*>(alloc_info.deviceMemory);
+    colorOutput.state = sl::ResourceState::eTextureWrite;
+    colorOutput.extent = {inputs.output_size.width, inputs.output_size.height, 1};
+    
+    tags.push_back({sl::kBufferTypeScalingOutputColor, colorOutput});
+
+    // Tag motion vectors if provided
+    if (inputs.motion_vectors && static_cast<VkImage>(inputs.motion_vectors_image) != VK_NULL_HANDLE) {
+        sl::Resource motionVectors{};
+        motionVectors.type = sl::ResourceType::eTex2d;
+        motionVectors.native = reinterpret_cast<void*>(static_cast<VkImage>(inputs.motion_vectors_image));
+        motionVectors.memory = reinterpret_cast<void*>(static_cast<VkDeviceMemory>(inputs.motion_vectors_memory));
+        motionVectors.view = reinterpret_cast<void*>(static_cast<VkImageView>(inputs.motion_vectors));
+        motionVectors.state = sl::ResourceState::eTextureRead;
+        motionVectors.extent = {inputs.input_size.width, inputs.input_size.height, 1};
+        
+        tags.push_back({sl::kBufferTypeMotionVectors, motionVectors});
+        LOG_DEBUG(Render_Vulkan, "DLSS using motion vectors");
+    }
+
+    // Tag depth buffer if provided
+    if (inputs.depth_buffer && static_cast<VkImage>(inputs.depth_image) != VK_NULL_HANDLE) {
+        sl::Resource depth{};
+        depth.type = sl::ResourceType::eTex2d;
+        depth.native = reinterpret_cast<void*>(static_cast<VkImage>(inputs.depth_image));
+        depth.memory = reinterpret_cast<void*>(static_cast<VkDeviceMemory>(inputs.depth_memory));
+        depth.view = reinterpret_cast<void*>(static_cast<VkImageView>(inputs.depth_buffer));
+        depth.state = sl::ResourceState::eTextureRead;
+        depth.extent = {inputs.input_size.width, inputs.input_size.height, 1};
+        
+        tags.push_back({sl::kBufferTypeDepth, depth});
+        LOG_DEBUG(Render_Vulkan, "DLSS using depth buffer");
+    }
+
+    // Tag all resources with Streamline
+    result = slSetTag(viewport, tags.data(), static_cast<uint32_t>(tags.size()), 
+                     static_cast<VkCommandBuffer>(cmdbuf));
+    if (result != sl::Result::eOk) {
+        LOG_ERROR(Render_Vulkan, "Failed to tag resources for DLSS: {}", static_cast<int>(result));
+        frame_index++;
+        return inputs.color_input;
+    }
+
+    // Evaluate DLSS feature
+    result = slEvaluateFeature(sl::kFeatureDLSS, *frame_token, viewport);
+    if (result != sl::Result::eOk) {
+        LOG_ERROR(Render_Vulkan, "Failed to evaluate DLSS feature: {}", static_cast<int>(result));
+        frame_index++;
+        return inputs.color_input;
+    }
+
+    LOG_DEBUG(Render_Vulkan, "DLSS evaluation successful: {}x{} -> {}x{}", 
+              inputs.input_size.width, inputs.input_size.height,
+              inputs.output_size.width, inputs.output_size.height);
+
     frame_index++;
-    return inputs.color_input;
+    
+    // Return the upscaled output image view
+    return output_img.output_image_view.get();
 #else
     PrepareOutputImage(inputs.output_size);
     frame_index++;
