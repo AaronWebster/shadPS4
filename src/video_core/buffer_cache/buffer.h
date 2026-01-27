@@ -7,6 +7,7 @@
 #include <optional>
 #include <utility>
 #include <vector>
+#include "common/simd_util.h"
 #include "common/types.h"
 #include "video_core/amdgpu/resource.h"
 #include "video_core/renderer_vulkan/vk_common.h"
@@ -182,7 +183,7 @@ public:
     /// Maps and commits a memory region with user provided data
     u64 Copy(auto src, size_t size, size_t alignment = 0) {
         const auto [data, offset] = Map(size, alignment);
-        std::memcpy(data, reinterpret_cast<const void*>(src), size);
+        Common::SimdMemcpy(data, reinterpret_cast<const void*>(src), size);
         Commit();
         return offset;
     }

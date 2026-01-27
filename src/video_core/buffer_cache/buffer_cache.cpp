@@ -5,6 +5,7 @@
 #include "common/alignment.h"
 #include "common/debug.h"
 #include "common/scope_exit.h"
+#include "common/simd_util.h"
 #include "core/memory.h"
 #include "video_core/amdgpu/liverpool.h"
 #include "video_core/buffer_cache/buffer_cache.h"
@@ -41,7 +42,7 @@ BufferCache::BufferCache(const Vulkan::Instance& instance_, Vulkan::Scheduler& s
 
     memory_tracker = std::make_unique<MemoryTracker>(tracker);
 
-    std::memset(gds_buffer.mapped_data.data(), 0, DataShareBufferSize);
+    Common::SimdMemzero(gds_buffer.mapped_data.data(), DataShareBufferSize);
 
     // Ensure the first slot is used for the null buffer
     const auto null_id =
@@ -786,7 +787,7 @@ void BufferCache::WriteDataBuffer(Buffer& buffer, VAddr address, const void* val
     vk::Buffer src_buffer = staging_buffer.Handle();
     if (num_bytes < StagingBufferSize) {
         const auto [staging, offset] = staging_buffer.Map(num_bytes);
-        std::memcpy(staging, value, num_bytes);
+        Common::SimdMemcpy(staging, value, num_bytes);
         copy.srcOffset = offset;
         staging_buffer.Commit();
     } else {
@@ -797,7 +798,7 @@ void BufferCache::WriteDataBuffer(Buffer& buffer, VAddr address, const void* val
             num_bytes};
         src_buffer = temp_buffer.Handle();
         u8* const staging = temp_buffer.mapped_data.data();
-        std::memcpy(staging, value, num_bytes);
+        Common::SimdMemcpy(staging, value, num_bytes);
         scheduler.DeferOperation([buffer = std::move(temp_buffer)]() mutable {});
     }
     scheduler.EndRendering();
