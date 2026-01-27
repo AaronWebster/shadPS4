@@ -340,7 +340,7 @@ public:
         return N;
     }
 
-    inline constexpr BitArray& operator|=(const BitArray& other) {
+    inline BitArray& operator|=(const BitArray& other) {
         size_t i = 0;
 #ifdef BIT_ARRAY_USE_AVX
         for (; i + WORDS_PER_AVX <= WORD_COUNT; i += WORDS_PER_AVX) {
@@ -356,7 +356,7 @@ public:
         return *this;
     }
 
-    inline constexpr BitArray& operator&=(const BitArray& other) {
+    inline BitArray& operator&=(const BitArray& other) {
         size_t i = 0;
 #ifdef BIT_ARRAY_USE_AVX
         for (; i + WORDS_PER_AVX <= WORD_COUNT; i += WORDS_PER_AVX) {
@@ -372,7 +372,7 @@ public:
         return *this;
     }
 
-    inline constexpr BitArray& operator^=(const BitArray& other) {
+    inline BitArray& operator^=(const BitArray& other) {
         size_t i = 0;
 #ifdef BIT_ARRAY_USE_AVX
         for (; i + WORDS_PER_AVX <= WORD_COUNT; i += WORDS_PER_AVX) {
@@ -388,25 +388,25 @@ public:
         return *this;
     }
 
-    inline constexpr BitArray operator|(const BitArray& other) const {
+    inline BitArray operator|(const BitArray& other) const {
         BitArray result = *this;
         result |= other;
         return result;
     }
 
-    inline constexpr BitArray operator&(const BitArray& other) const {
+    inline BitArray operator&(const BitArray& other) const {
         BitArray result = *this;
         result &= other;
         return result;
     }
 
-    inline constexpr BitArray operator^(const BitArray& other) const {
+    inline BitArray operator^(const BitArray& other) const {
         BitArray result = *this;
         result ^= other;
         return result;
     }
 
-    inline constexpr BitArray operator~() const {
+    inline BitArray operator~() const {
         BitArray result = *this;
         size_t i = 0;
 #ifdef BIT_ARRAY_USE_AVX
@@ -423,7 +423,7 @@ public:
         return result;
     }
 
-    inline constexpr bool operator==(const BitArray& other) const {
+    inline bool operator==(const BitArray& other) const {
         size_t i = 0;
 #ifdef BIT_ARRAY_USE_AVX
         for (; i + WORDS_PER_AVX <= WORD_COUNT; i += WORDS_PER_AVX) {
