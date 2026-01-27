@@ -5,6 +5,7 @@
 #include "common/assert.h"
 #include "common/config.h"
 #include "common/debug.h"
+#include "common/simd_util.h"
 #include "core/file_sys/fs.h"
 #include "core/libraries/kernel/memory.h"
 #include "core/libraries/kernel/orbis_error.h"
@@ -120,9 +121,9 @@ void MemoryManager::CopySparseMemory(VAddr virtual_addr, u8* dest, u64 size) {
     while (size) {
         u64 copy_size = std::min<u64>(vma->second.size - (virtual_addr - vma->first), size);
         if (vma->second.IsMapped()) {
-            std::memcpy(dest, std::bit_cast<const u8*>(virtual_addr), copy_size);
+            Common::SimdMemcpy(dest, std::bit_cast<const u8*>(virtual_addr), copy_size);
         } else {
-            std::memset(dest, 0, copy_size);
+            Common::SimdMemzero(dest, copy_size);
         }
         size -= copy_size;
         virtual_addr += copy_size;
@@ -140,7 +141,7 @@ bool MemoryManager::TryWriteBacking(void* address, const void* data, u32 num_byt
         return false;
     }
     u8* backing = impl.BackingBase() + vma.phys_base + (virtual_addr - vma.base);
-    memcpy(backing, data, num_bytes);
+    Common::SimdMemcpy(backing, data, num_bytes);
     return true;
 }
 
@@ -741,7 +742,7 @@ u64 MemoryManager::UnmapBytesFromEntry(VAddr virtual_addr, VirtualMemoryArea vma
         // Now that there is a physical backing used for flexible memory,
         // manually erase the contents before unmapping to prevent possible issues.
         const auto unmap_hardware_address = impl.BackingBase() + phys_base + start_in_vma;
-        std::memset(unmap_hardware_address, 0, adjusted_size);
+        Common::SimdMemzero(unmap_hardware_address, adjusted_size);
 
         // Address space unmap needs the physical_base from the start of the vma,
         // so calculate the phys_base to unmap from here.

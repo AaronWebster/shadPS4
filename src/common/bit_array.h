@@ -340,62 +340,111 @@ public:
         return N;
     }
 
-    inline constexpr BitArray& operator|=(const BitArray& other) {
-        for (size_t i = 0; i < WORD_COUNT; ++i) {
+    inline BitArray& operator|=(const BitArray& other) {
+        size_t i = 0;
+#ifdef BIT_ARRAY_USE_AVX
+        for (; i + WORDS_PER_AVX <= WORD_COUNT; i += WORDS_PER_AVX) {
+            const __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&data[i]));
+            const __m256i b = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&other.data[i]));
+            const __m256i result = _mm256_or_si256(a, b);
+            _mm256_storeu_si256(reinterpret_cast<__m256i*>(&data[i]), result);
+        }
+#endif
+        for (; i < WORD_COUNT; ++i) {
             data[i] |= other.data[i];
         }
         return *this;
     }
 
-    inline constexpr BitArray& operator&=(const BitArray& other) {
-        for (size_t i = 0; i < WORD_COUNT; ++i) {
+    inline BitArray& operator&=(const BitArray& other) {
+        size_t i = 0;
+#ifdef BIT_ARRAY_USE_AVX
+        for (; i + WORDS_PER_AVX <= WORD_COUNT; i += WORDS_PER_AVX) {
+            const __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&data[i]));
+            const __m256i b = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&other.data[i]));
+            const __m256i result = _mm256_and_si256(a, b);
+            _mm256_storeu_si256(reinterpret_cast<__m256i*>(&data[i]), result);
+        }
+#endif
+        for (; i < WORD_COUNT; ++i) {
             data[i] &= other.data[i];
         }
         return *this;
     }
 
-    inline constexpr BitArray& operator^=(const BitArray& other) {
-        for (size_t i = 0; i < WORD_COUNT; ++i) {
+    inline BitArray& operator^=(const BitArray& other) {
+        size_t i = 0;
+#ifdef BIT_ARRAY_USE_AVX
+        for (; i + WORDS_PER_AVX <= WORD_COUNT; i += WORDS_PER_AVX) {
+            const __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&data[i]));
+            const __m256i b = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&other.data[i]));
+            const __m256i result = _mm256_xor_si256(a, b);
+            _mm256_storeu_si256(reinterpret_cast<__m256i*>(&data[i]), result);
+        }
+#endif
+        for (; i < WORD_COUNT; ++i) {
             data[i] ^= other.data[i];
         }
         return *this;
     }
 
-    inline constexpr BitArray operator|(const BitArray& other) const {
+    inline BitArray operator|(const BitArray& other) const {
         BitArray result = *this;
         result |= other;
         return result;
     }
 
-    inline constexpr BitArray operator&(const BitArray& other) const {
+    inline BitArray operator&(const BitArray& other) const {
         BitArray result = *this;
         result &= other;
         return result;
     }
 
-    inline constexpr BitArray operator^(const BitArray& other) const {
+    inline BitArray operator^(const BitArray& other) const {
         BitArray result = *this;
         result ^= other;
         return result;
     }
 
-    inline constexpr BitArray operator~() const {
+    inline BitArray operator~() const {
         BitArray result = *this;
-        for (size_t i = 0; i < WORD_COUNT; ++i) {
+        size_t i = 0;
+#ifdef BIT_ARRAY_USE_AVX
+        const __m256i all_ones = _mm256_set1_epi64x(-1);
+        for (; i + WORDS_PER_AVX <= WORD_COUNT; i += WORDS_PER_AVX) {
+            const __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&result.data[i]));
+            const __m256i inverted = _mm256_xor_si256(a, all_ones);
+            _mm256_storeu_si256(reinterpret_cast<__m256i*>(&result.data[i]), inverted);
+        }
+#endif
+        for (; i < WORD_COUNT; ++i) {
             result.data[i] = ~result.data[i];
         }
         return result;
     }
 
-    inline constexpr bool operator==(const BitArray& other) const {
-        u64 result = 0;
-        for (size_t i = 0; i < WORD_COUNT; ++i) {
-            result |= data[i] ^ other.data[i];
+    inline bool operator==(const BitArray& other) const {
+        size_t i = 0;
+#ifdef BIT_ARRAY_USE_AVX
+        for (; i + WORDS_PER_AVX <= WORD_COUNT; i += WORDS_PER_AVX) {
+            const __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&data[i]));
+            const __m256i b = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&other.data[i]));
+            const __m256i xor_result = _mm256_xor_si256(a, b);
+            // Check if all bits are zero (arrays are equal)
+            if (!_mm256_testz_si256(xor_result, xor_result)) {
+                return false;
+            }
         }
-        return result == 0;
+#endif
+        for (; i < WORD_COUNT; ++i) {
+            if (data[i] != other.data[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
-    inline constexpr bool operator!=(const BitArray& other) const {
+    inline bool operator!=(const BitArray& other) const {
         return !(*this == other);
     }
 
