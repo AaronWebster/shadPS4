@@ -171,7 +171,8 @@ inline int SimdMemcmp(const void* ptr1, const void* ptr2, size_t size) {
             const int mask2 = _mm256_movemask_epi8(cmp2);
             const int mask3 = _mm256_movemask_epi8(cmp3);
             
-            // movemask returns -1 (0xFFFFFFFF) when all bytes are equal
+            // When all bytes are equal, movemask returns 0xFFFFFFFF (all 32 bits set)
+            // We AND all masks together and check if the result is 0xFFFFFFFF
             if ((mask0 & mask1 & mask2 & mask3) != static_cast<int>(0xFFFFFFFF)) {
                 // Found a difference, use memcmp for exact location
                 return std::memcmp(p1, p2, AVX2_SIZE * 4);

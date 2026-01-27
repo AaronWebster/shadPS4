@@ -444,7 +444,7 @@ public:
         return true;
     }
 
-    inline constexpr bool operator!=(const BitArray& other) const {
+    inline bool operator!=(const BitArray& other) const {
         return !(*this == other);
     }
 
