@@ -429,8 +429,9 @@ public:
         for (; i + WORDS_PER_AVX <= WORD_COUNT; i += WORDS_PER_AVX) {
             const __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&data[i]));
             const __m256i b = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&other.data[i]));
-            const __m256i cmp = _mm256_cmpeq_epi64(a, b);
-            if (_mm256_movemask_epi8(cmp) != 0xFFFFFFFF) {
+            const __m256i xor_result = _mm256_xor_si256(a, b);
+            // Check if all bits are zero (arrays are equal)
+            if (!_mm256_testz_si256(xor_result, xor_result)) {
                 return false;
             }
         }
